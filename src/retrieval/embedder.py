@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 from sentence_transformers import SentenceTransformer
 import chromadb
@@ -14,6 +13,12 @@ def build_vector_store(chunks: list[dict], persist_path: str = "data/index/chrom
     model = SentenceTransformer("all-MiniLM-L6-v2")
 
     client = chromadb.PersistentClient(path=persist_path)
+
+    try:
+        client.delete_collection(name="research_papers")
+    except Exception:
+        pass
+
     collection = client.get_or_create_collection(name="research_papers")
 
     documents = [chunk["text"] for chunk in chunks]
@@ -23,6 +28,7 @@ def build_vector_store(chunks: list[dict], persist_path: str = "data/index/chrom
             "paper_id": chunk["paper_id"],
             "paper_name": chunk["paper_name"],
             "page_number": chunk["page_number"],
+            "section": chunk["section"],
         }
         for chunk in chunks
     ]

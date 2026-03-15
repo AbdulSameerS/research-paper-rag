@@ -1,6 +1,9 @@
 import json
 from pathlib import Path
 
+from src.ingestion.section_detector import detect_section_from_text
+from src.utils.helpers import clean_text, is_reference_heavy, is_noise_heavy
+
 
 def split_into_word_chunks(text: str, chunk_size: int = 300, overlap: int = 50) -> list[str]:
     words = text.split()
@@ -15,6 +18,7 @@ def split_into_word_chunks(text: str, chunk_size: int = 300, overlap: int = 50) 
         chunk_words = words[start:start + chunk_size]
         if not chunk_words:
             continue
+
         chunks.append(" ".join(chunk_words))
 
         if start + chunk_size >= len(words):
@@ -27,16 +31,26 @@ def chunk_parsed_pages(parsed_pages: list[dict]) -> list[dict]:
     chunked_records = []
 
     for page in parsed_pages:
+        section = detect_section_from_text(page["text"])
         chunks = split_into_word_chunks(page["text"], chunk_size=300, overlap=50)
 
         for chunk_index, chunk_text in enumerate(chunks, start=1):
+            cleaned_chunk = clean_text(chunk_text)
+
+            if not cleaned_chunk:
+                continue
+
+            if section == "References" or is_reference_heavy(cleaned_chunk) or is_noise_heavy(cleaned_chunk):
+                continue
+
             chunked_records.append(
                 {
                     "paper_id": page["paper_id"],
                     "paper_name": page["paper_name"],
                     "page_number": page["page_number"],
+                    "section": section,
                     "chunk_id": f'{page["paper_id"]}_p{page["page_number"]}_c{chunk_index}',
-                    "text": chunk_text,
+                    "text": cleaned_chunk,
                 }
             )
 
